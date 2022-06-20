@@ -1,4 +1,5 @@
 from cmath import acos, asin
+from smtpd import DebuggingServer
 import sys
 import math
 
@@ -27,10 +28,25 @@ def distance_between_two_points(reference_x, reference_y, target_x, target_y):
     y_delta = target_y - reference_y
     return int(math.sqrt((x_delta ** 2) + (y_delta ** 2)))
 
-def calculate_angles_from_coords(point_a.x, point_a.y, point_b.x, point_b.y, point_c.x, point_c.y):
-    distance_a_to_b = distance_between_two_points(point_a.x, point_a.y, point_b.x, point_b.y)
-    distance_b_to_c = distance_between_two_points(point_b.x, point_b.y, point_c.x, point_c.y)
-    distance_c_to_a = distance_between_two_points(point_c.x, point_c.y, point_a.x, point_a.y)
+
+def calculate_angles_from_coords(point_a_x, point_a_y, point_b_x, point_b_y, point_c_x, point_c_y):
+    try:
+        debug(f"point a {point_a_x}:{point_a_y}, point b {point_b_x}:{point_b_y}, point c {point_c_x}:{point_c_y}")
+        side_a= distance_between_two_points(point_a_x, point_a_y, point_b_x, point_b_y)
+        side_b = distance_between_two_points(point_b_x, point_b_y, point_c_x, point_c_y)
+        side_c = distance_between_two_points(point_c_x, point_c_y, point_a_x, point_a_y)
+        angle_a = acos((side_b**2 + side_c **2 - side_a **2)/(2* side_b * side_c)).real
+        angle_b = acos((side_a**2 + side_c **2 - side_b **2)/(2* side_a * side_c)).real
+        angle_c = acos((side_a**2 + side_b **2 - side_c **2)/(2* side_a * side_b)).real
+        a_as_degrees = round(57.29*angle_a,0)
+        b_as_degrees = round(57.29*angle_b,0)
+        c_as_degrees = round(57.29*angle_c,0)
+        return [a_as_degrees, b_as_degrees, c_as_degrees]
+    except Exception as e:
+        debug(f" {e} ")
+
+
+
     
 
 def calculate_trajectory(primary_x, primary_y, secondary_x, secondary_y, target_x, target_y):
@@ -50,8 +66,6 @@ def will_pod_hit(refrence_x, reference_y, secondary_x, secondary_y, target_x, ta
     # v 1.4 - apply vector angles and try and determine where it will go over the distance 
 
 
-    vectors = calculate_angle(refrence_x, reference_y, secondary_x, secondary_y, target_x, target_y)
-    debug(vectors)
 
     return True
 
@@ -73,7 +87,7 @@ class Checkpoint:
         self.distance_to_next = distance_between_two_points(self.x,self.y, next_x, next_y)
     
     def set_angle_to_next(self, previous_checkpoint, next_checkpoint):
-        trajectory_data = calculate_trajectory(previous_checkpoint.x, previous_checkpoint.y,self.x, self.y,next_checkpoint.x, next_checkpoint.y)
+        trajectory_data = calculate_angles_from_coords(previous_checkpoint.x, previous_checkpoint.y,self.x, self.y,next_checkpoint.x, next_checkpoint.y)
         self.angle_to_next = trajectory_data[0]
     
 
@@ -135,7 +149,7 @@ class Course:
         elif self.is_map_conditions_met(next_checkpoint_x, next_checkpoint_y): #set checkpoints
             debug("Map read executing analysis")
             for c_index in range(len(self.checkpoints)):
-                wrap_index = c_index+1 if c_index+1 < len(self.checkpoints) else -1
+                wrap_index = c_index+1 if c_index+1 < len(self.checkpoints) else 0
                 set_distance(self.checkpoints[c_index - 1], self.checkpoints[c_index])
                 debug(f"{c_index}, {wrap_index}")
                 self.checkpoints[c_index].set_angle_to_next(self.checkpoints[c_index-1], self.checkpoints[wrap_index])
@@ -146,7 +160,7 @@ class Course:
 
 def map_checkpoint(previous_checkpoint, current_checkpoint, next_checkpoint):
     current_checkpoint.update_distance_to_next(next_checkpoint.x, next_checkpoint.y)
-    current_checkpoint.apex_angle = calculate_trajectory(previous_checkpoint.x, previous_checkpoint.y, current_checkpoint.x, current_checkpoint.y, next_checkpoint.x, next_checkpoint.y)[0]
+    current_checkpoint.apex_angle = calculate_angles_from_coords(previous_checkpoint.x, previous_checkpoint.y, current_checkpoint.x, current_checkpoint.y, next_checkpoint.x, next_checkpoint.y)[0]
 
 
 def set_distance(source_checkpoint, target_checkpoint):
@@ -209,16 +223,16 @@ class Pod:
             self.thrust += rate
     
     def decellerate(self, rate):
-        if (self.thrust - rate )<17:
-            self.thrust = 17
+        if (self.thrust - rate )<5:
+            self.thrust = 5
         else:
             self.thrust -= rate
     
     def will_I_hit_target(self):
-        self.hit_next_target = True if self.trajectory_angle in range(0,30)  else False 
+        self.hit_next_target = True if self.trajectory_angle in range(0,40)  else False 
 
     def __str__(self):
-        return(f"pod {self.identity} Speed {self.speed} Speed to target {self.speed_to_target}, trajectory angle to target {self.trajectory_angle}")
+        return(f"pod {self.identity} Speed {self.speed} Speed to target {self.speed_to_target}, trajectory angle to target {self.trajectory_angle}, thrust {self.thrust}, hit target {self.hit_next_target}")
 
 
 
