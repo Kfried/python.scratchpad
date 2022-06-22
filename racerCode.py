@@ -98,21 +98,9 @@ class Telemetry:
     def __init__(self):
      self.readings = []
     
-    def add_reading(self,iteration, target_id,  x, y, angle_to_target, distance_to_target, speed, trajectory_angle, speed_toTarget, will_hit):
-        rec = {}
-        rec["iteration"] = iteration
-        rec["target"] = target_id
-        rec["ship_x"] = x
-        rec["ship_y"] = y
-        rec["angle_to_target"] = angle_to_target if angle_to_target >=0 else angle_to_target * -1 
-        rec["distance_to_target"] = distance_to_target
-        rec["trajectory_angle"] = trajectory_angle
-        rec["speed_to_target"] = speed_toTarget
-        rec["ship_speed"] = speed
-        rec["will_hit_target"] = will_hit
-
-        debug(rec)
-        self.readings.append(rec)
+    def add_reading(self, record):
+        debug(record)
+        self.readings.append(record)
 
 
 
@@ -174,6 +162,9 @@ class Pod:
     Independent analysis shows that the pod max acceleration is over 5 turns then slow but continual, max speed in 24 turns with no influence from non linear momentum
     the pod turns 17 degrees per tick,  
 
+    validation = 
+        the calculated distance to target shall match reported  - passed
+
 
     '''
     def __init__(self, identity, start_x, start_y, distance_to_target):
@@ -192,6 +183,7 @@ class Pod:
         self.thrust = 100
         self.hit_next_target = True
         self.fire_boost = False
+        self.angle_to_target = 0
 
 
     def update_position(self, target_id, new_x, new_y, distance_to_target, angle_to_target, target_x, target_y):
@@ -203,8 +195,21 @@ class Pod:
         self.trajectory_angle = trajectory[0]
         self.update_pod_position(new_x, new_y)
         self.target_distance = distance_to_target
+        self.angle_to_target = angle_to_target
         self.will_I_hit_target()
-        self.tel.add_reading(self.race_iterator,self.hit_next_target, target_id, new_x, new_y, angle_to_target, distance_to_target, self.speed, self.trajectory_angle, self.speed_to_target)
+        debug(f"calculated distance to target {distance_between_two_points(self.x, self.y, target_x, target_y)} system distance {distance_to_target}")
+        reading_data = {}
+        reading_data["race_iteration"] = self.race_iterator
+        reading_data["hit_target_indicator"] = self.hit_next_target
+        reading_data["target_id"] = target_id
+        reading_data["pod_x"] = new_x
+        reading_data["pod_y"] = new_y
+        reading_data["angle_to_target"] = angle_to_target
+        reading_data["distance_to_target"] = distance_to_target
+        reading_data["trajectory_angle"] = self.trajectory_angle
+        reading_data["speed"] = self.speed
+        reading_data["speed_to_target"] = self.speed_to_target
+        self.tel.add_reading(reading_data)
         
 
     def update_speed(self, new_x, new_y):
@@ -229,10 +234,10 @@ class Pod:
             self.thrust -= rate
     
     def will_I_hit_target(self):
-        self.hit_next_target = True if self.trajectory_angle in range(0,40)  else False 
+        self.hit_next_target = True if (self.trajectory_angle in range(0,15) or self.angle_to_target <20 )  else False 
 
     def __str__(self):
-        return(f"pod {self.identity} Speed {self.speed} Speed to target {self.speed_to_target}, trajectory angle to target {self.trajectory_angle}, thrust {self.thrust}, hit target {self.hit_next_target}")
+        return(f"pod {self.identity} Speed {self.speed} Speed to target {self.speed_to_target}, trajectory angle to target {self.trajectory_angle}, thrust {self.thrust}, hit target {self.hit_next_target}, angletoTarget {self.angle_to_target}")
 
 
 
@@ -273,7 +278,8 @@ while True:
     player = pods[0]
     course.update_active_target(next_checkpoint_x, next_checkpoint_y)
     
-    if pods[0].x != x or pods[0].y != y: #is the pod in a different positon to last time
+    if player.x != x or player.y != y: #is the pod in a different positon to last time
+        next_checkpoint_angle = distance_between_two_points(x,y,next_checkpoint_x, next_checkpoint_y)
         pods[0].update_position(course.active_target_checkpoint.position, x,y,next_checkpoint_dist, next_checkpoint_angle,next_checkpoint_x, next_checkpoint_y )
         debug(f"{pods[0]}")
     
